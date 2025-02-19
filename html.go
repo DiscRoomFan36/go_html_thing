@@ -1,5 +1,7 @@
 package main
 
+import "errors"
+
 func Assert(b bool, reason any) {
 	if !b {
 		panic(reason)
@@ -287,4 +289,31 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 	Assert(len(subclass_stack) == 0, "malformed div")
 
 	return html_doc, nil
+}
+
+// -------------------------------------
+//              Helpers
+// -------------------------------------
+
+func num_sub_elements(sub HTML_SubClass) int {
+	return int(sub.final_index) - int(sub.own_index) - 1
+}
+
+func find_element_by_header(doc HTML_Document, header string) (HTML_SubClass, error) {
+	for _, inner := range doc.all_elements {
+		if inner.heading_tag == header {
+			return inner, nil
+		}
+	}
+	return HTML_SubClass{}, errors.New("no element found")
+}
+
+func all_top_level_indices(doc HTML_Document, element HTML_SubClass) []int {
+	results := make([]int, 0)
+	i := element.own_index + 1
+	for i < uint64(element.final_index) {
+		results = append(results, int(i))
+		i = uint64(doc.all_elements[i].final_index)
+	}
+	return results
 }

@@ -3,9 +3,9 @@
 *.html
 *.txt
 *.md
+html_thing
+cached/
 
 # get out of here go.
 go.mod
 go.sum
-
-html_thing
