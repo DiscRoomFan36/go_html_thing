@@ -201,14 +201,14 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 				parent_index = int64(subclass_stack[len(subclass_stack)-1].sub.own_index)
 			}
 
-			sub := HTML_SubClass{
+			html_doc.all_elements = append(html_doc.all_elements, HTML_SubClass{
 				heading_tag:  document[index : k+1],
 				class:        class_tag,
 				own_index:    own_index,
 				parent_index: parent_index,
-			}
 
-			html_doc.all_elements = append(html_doc.all_elements, sub)
+				final_index: -1,
+			})
 
 			new_helper := helper_struct{
 				sub:              &html_doc.all_elements[len(html_doc.all_elements)-1],
@@ -224,12 +224,12 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 			if !is_void_element {
 				subclass_stack = append(subclass_stack, new_helper)
 			} else {
-				sub.all_subtext = document[k+1 : k+1]
-				sub.final_index = int64(len(subclass_stack))
+				new_helper.sub.all_subtext = document[k+1 : k+1]
+				new_helper.sub.final_index = int64(len(subclass_stack))
 			}
 
 			if class_tag == "script" {
-				Assert(is_void_element == false, "if this breaks WTF")
+				Assert(!is_void_element, "if this breaks WTF")
 
 				// we need to handle this...
 				l := k + 1
@@ -269,8 +269,15 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 				// pop last item of the stack
 				var item helper_struct
 				subclass_stack, item = pop(subclass_stack)
-				item.sub.final_index = int64(len(html_doc.all_elements))
-				item.sub.all_subtext = document[item.start_text_index:index]
+
+				// TODO this is dumb, just store the position in the struct...
+				// go pointers are stupid...
+				real_item := &html_doc.all_elements[item.sub.own_index]
+
+				// fmt.Printf("start_text_index: %d\n", item.start_text_index)
+
+				real_item.final_index = int64(len(html_doc.all_elements))
+				real_item.all_subtext = document[item.start_text_index:index]
 			}
 		}
 

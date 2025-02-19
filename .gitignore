@@ -1,4 +1,11 @@
 
+# artifacts
 *.html
-
 *.txt
+*.md
+
+# get out of here go.
+go.mod
+go.sum
+
+html_thing
