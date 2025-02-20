@@ -140,9 +140,13 @@ func get_url_or_cached(url string) string {
 }
 
 func main() {
-	url := "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+	rr_if, err := get_info_storage()
+	Assert(err == nil, err)
+	defer save_info_storage(rr_if)
+	fmt.Printf("rr_if: %v\n", rr_if)
 
-	body := get_url_or_cached(url)
+	const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+	body := get_url_or_cached(test_url)
 	fmt.Printf("len body %d\n", len(body))
 
 	html_doc, err := parse_HTML_Document(string(body))

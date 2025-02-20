@@ -5,6 +5,7 @@
 *.md
 html_thing
 cached/
+*.info_store
 
 # get out of here go.
 go.mod
