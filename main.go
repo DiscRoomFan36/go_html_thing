@@ -29,9 +29,6 @@ func get_html_from_url(url string) string {
 	return string(body)
 }
 
-const HEADER_CLASS = "<h1 style=\"margin-top: 10px\" class=\"font-white break-word\">"
-const CHAPTER_INNER_CLASS = "<div class=\"chapter-inner chapter-content\">"
-
 func split_once(s string, sep string) (string, string, bool) {
 	split := strings.SplitN(s, sep, 2)
 	if len(split) == 1 {
@@ -98,20 +95,24 @@ func exists(path string) (bool, error) {
 const DEBUG_PRINT_URL_OR_CACHE = true
 const CACHED_FOLDER_NAME = "./cached/"
 
+func make_folder_if_not_exists(name string) error {
+	exist, err := exists(name)
+	if err != nil || exist {
+		return err
+	}
+
+	return os.Mkdir(name, 0755)
+}
+
 func get_url_or_cached(url string) string {
 	royal_ident := parse_RoyalRoad_url_to_canonical(url)
 
-	{ // make cached folder if it didn't exist
-		exist, err := exists(CACHED_FOLDER_NAME)
-		Assert(err == nil, err)
-		if !exist {
-			err := os.Mkdir(CACHED_FOLDER_NAME, 0755)
-			Assert(err == nil, err)
-		}
-	}
+	// make the cache if it doesn't exist
+	err := make_folder_if_not_exists(CACHED_FOLDER_NAME)
+	Assert(err == nil, err)
 
 	// check if the page is in the cache
-	possible_filename := fmt.Sprintf("%s%s", CACHED_FOLDER_NAME, royal_ident.to_cannon_file_ident())
+	possible_filename := fmt.Sprintf("%s%s.html", CACHED_FOLDER_NAME, royal_ident.to_cannon_file_ident())
 	exist, err := exists(possible_filename)
 	Assert(err == nil, err)
 	if exist {
@@ -145,68 +146,51 @@ func main() {
 	defer save_info_storage(rr_if)
 	fmt.Printf("rr_if: %v\n", rr_if)
 
-	const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+	// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+	const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
+	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
+
 	body := get_url_or_cached(test_url)
-	fmt.Printf("len body %d\n", len(body))
 
 	html_doc, err := parse_HTML_Document(string(body))
 	Assert(err == nil, err)
+	html_doc.original_url = test_url
 
-	element, err := find_element_by_header(html_doc, CHAPTER_INNER_CLASS)
-	Assert(err == nil, err)
+	rr_ident := parse_RoyalRoad_url_to_canonical(html_doc.original_url)
 
-	out_put_markdown_text := strings.Builder{}
+	{ // set the rr_if info to the correct thing
+		_, exist_fiction := rr_if.fiction_ident_to_titles[rr_ident.fiction_ident]
+		if !exist_fiction {
+			fmt.Printf("New Fiction found!\n")
+			rr_if.fiction_ident_to_titles[rr_ident.fiction_ident] = html_doc.get_fiction_title_from_chapter()
+		}
 
-	{ // Deal with the Title
-		title_text, err := find_element_by_header(html_doc, HEADER_CLASS)
-		Assert(err == nil, err)
-		out_put_markdown_text.WriteString("# ")
-		out_put_markdown_text.WriteString(title_text.all_subtext)
-		out_put_markdown_text.WriteString("\n")
-	}
-
-	{ // Do the Body of the chapter
-		top_level := all_top_level_indices(html_doc, element)
-		for _, i := range top_level {
-			item := html_doc.all_elements[i]
-
-			if item.class != "p" {
-				fmt.Printf("not doing the div, its a trap at %d\n", i)
-				continue
-			}
-
-			// fmt.Printf("%d -> %s\n", i, item.class)
-
-			sub_elements := all_top_level_indices(html_doc, item)
-			for _, sub_ele_i := range sub_elements {
-				sub_ele := html_doc.all_elements[sub_ele_i]
-
-				switch sub_ele.class {
-				case "span":
-					{
-						out_put_markdown_text.WriteString(sub_ele.all_subtext)
-					}
-				case "em":
-					{
-						Assert(num_sub_elements(sub_ele) == 1, "em tag is italics, should only contain one class")
-						out_put_markdown_text.WriteString("*")
-						out_put_markdown_text.WriteString(html_doc.all_elements[sub_ele.own_index+1].all_subtext)
-						out_put_markdown_text.WriteString("*")
-					}
-				default:
-					{
-						fmt.Printf("Unknown class found, %s\n", sub_ele.class)
-					}
-				}
-			}
-
-			out_put_markdown_text.WriteString("\n\n")
+		_, exist_chapter := rr_if.chapter_ident_to_titles[rr_ident.chapter_ident]
+		if !exist_chapter {
+			fmt.Printf("New chapter found!\n")
+			rr_if.chapter_ident_to_titles[rr_ident.chapter_ident] = html_doc.get_chapter_title()
 		}
 	}
 
-	result := out_put_markdown_text.String()
-	// out_filename := fmt.Sprintf("%s/")
-	dump_string(result, "test.md")
+	rr_chapter_markdown := html_doc.rr_chapter_to_markdown()
+
+	{ // put the markdown into its proper place
+		const MARKDOWN_OUTPUT_FOLDER = "./markdown/"
+
+		Assert(contains(rr_if.fiction_ident_to_titles, rr_ident.fiction_ident), "no fiction ident in rr_if, impossible")
+		Assert(contains(rr_if.chapter_ident_to_titles, rr_ident.chapter_ident), "no chapter ident in rr_if, impossible")
+
+		make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER)
+		make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER + rr_if.fiction_ident_to_titles[rr_ident.fiction_ident])
+
+		out_filename := fmt.Sprintf(MARKDOWN_OUTPUT_FOLDER+"%s/%s.md", rr_if.fiction_ident_to_titles[rr_ident.fiction_ident], rr_if.chapter_ident_to_titles[rr_ident.chapter_ident])
+		dump_string(rr_chapter_markdown, out_filename)
+	}
 
 	print("Its all Good!\n")
+}
+
+func contains[T comparable, U any](m map[T]U, key T) bool {
+	_, contains := m[key]
+	return contains
 }

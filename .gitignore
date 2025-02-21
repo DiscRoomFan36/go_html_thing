@@ -6,6 +6,7 @@
 html_thing
 cached/
 *.info_store
+markdown/
 
 # get out of here go.
 go.mod

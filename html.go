@@ -1,6 +1,10 @@
 package main
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 func Assert(b bool, reason any) {
 	if !b {
@@ -9,6 +13,10 @@ func Assert(b bool, reason any) {
 }
 
 type HTML_Document struct {
+	// this is not set in the parse HTML function,
+	// please set it at your own convenience
+	original_url string
+
 	// contains the bytes or string that is the entire HTML doc
 	original_string string
 
@@ -84,7 +92,9 @@ func pop[T any](array []T) ([]T, T) {
 }
 
 func class_tag_is_one_of_the_dumb_ones(class_tag string) bool {
-	var AUTO_VOID_TAGS = [...]string{"meta", "link", "img", "input"}
+	// NOTE <br> is actually a line break...
+	// NOTE <hr> is some header thing...
+	var AUTO_VOID_TAGS = [...]string{"meta", "link", "img", "input", "br", "hr"}
 	for _, tag := range AUTO_VOID_TAGS {
 		if tag == class_tag {
 			return true
@@ -288,6 +298,10 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 
 	Assert(len(subclass_stack) == 0, "malformed div")
 
+	for _, item := range html_doc.all_elements {
+		Assert(num_sub_elements(item) >= 0, "must have positive sub elements")
+	}
+
 	return html_doc, nil
 }
 
@@ -316,4 +330,117 @@ func all_top_level_indices(doc HTML_Document, element HTML_SubClass) []int {
 		i = uint64(doc.all_elements[i].final_index)
 	}
 	return results
+}
+
+// -------------------------------------
+//           Royal Road Stuff
+// -------------------------------------
+
+func (doc HTML_Document) is_royal_road_link() bool {
+	if doc.original_url == "" {
+		panic("did not set url before calling this function!!!")
+	}
+
+	if strings.HasPrefix(doc.original_url, "https://www.royalroad.com") {
+		return true
+	}
+	return false
+}
+
+func (doc HTML_Document) is_rr_chapter() bool {
+	if doc.original_url == "" {
+		panic("did not set url before calling this function!!!")
+	}
+
+	if !doc.is_royal_road_link() {
+		return false
+	}
+
+	_, right, ok := split_once(doc.original_string, "chapter/")
+	if ok {
+		Assert(len(right) > 0, "invalid link")
+		return true
+	}
+
+	return false
+}
+
+func (doc HTML_Document) get_chapter_title() string {
+	Assert(doc.is_rr_chapter(), "HTML must be a royal road chapter link")
+
+	// royal road header class. might break...
+	const HEADER_CLASS = "<h1 style=\"margin-top: 10px\" class=\"font-white break-word\">"
+	title_text, err := find_element_by_header(doc, HEADER_CLASS)
+	Assert(err == nil, err)
+
+	return title_text.all_subtext
+}
+
+func (doc HTML_Document) get_fiction_title_from_chapter() string {
+	Assert(doc.is_rr_chapter(), "HTML must be a royal road chapter link")
+
+	const FICTION_TITLE_CLASS = "<h2 style=\"font-size: 24px\" class=\"font-white inline-block\">"
+
+	title_text, err := find_element_by_header(doc, FICTION_TITLE_CLASS)
+	Assert(err == nil, err)
+
+	return title_text.all_subtext
+}
+
+func (doc HTML_Document) rr_chapter_to_markdown() string {
+	const CHAPTER_INNER_CLASS = "<div class=\"chapter-inner chapter-content\">"
+
+	Assert(doc.is_rr_chapter(), "must be a rr chapter")
+
+	out_put_markdown_text := strings.Builder{}
+
+	{ // Deal with the Title
+		out_put_markdown_text.WriteString("# ")
+		out_put_markdown_text.WriteString(doc.get_chapter_title())
+		out_put_markdown_text.WriteString("\n")
+	}
+
+	{ // Do the Body of the chapter
+		element, err := find_element_by_header(doc, CHAPTER_INNER_CLASS)
+		Assert(err == nil, err)
+
+		for _, i := range all_top_level_indices(doc, element) {
+			item := doc.all_elements[i]
+
+			fmt.Printf("item.class %s, len %d\n", item.class, num_sub_elements(item))
+
+			if item.class != "p" {
+				fmt.Printf("theres a non <p> block at %d, skipping\n", i)
+				continue
+			}
+
+			// fmt.Printf("%d -> %s\n", i, item.class)
+
+			for _, sub_ele_i := range all_top_level_indices(doc, item) {
+				sub_ele := doc.all_elements[sub_ele_i]
+
+				switch sub_ele.class {
+				case "span":
+					{
+						out_put_markdown_text.WriteString(sub_ele.all_subtext)
+					}
+				case "em":
+					{
+						Assert(num_sub_elements(sub_ele) == 1, "em tag is italics, should only contain one class")
+						out_put_markdown_text.WriteString("*")
+						out_put_markdown_text.WriteString(doc.all_elements[sub_ele.own_index+1].all_subtext)
+						out_put_markdown_text.WriteString("*")
+					}
+				default:
+					{
+						fmt.Printf("Unknown class found, %s\n", sub_ele.class)
+					}
+				}
+			}
+
+			out_put_markdown_text.WriteString("\n\n")
+		}
+	}
+
+	return out_put_markdown_text.String()
 }
