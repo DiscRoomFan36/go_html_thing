@@ -148,6 +148,8 @@ func save_info_storage(rr_if RoyalRoad_Info_Storage) error {
 		data.WriteString("\n")
 	}
 
+	data.WriteString("\n")
+
 	for ident, name := range rr_if.chapter_ident_to_titles {
 		data.WriteString(PARSER_CHAPTER_TAG + PARSER_SEPARATOR_FIRST)
 		data.WriteString(ident)
