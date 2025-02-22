@@ -404,6 +404,9 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 		element, err := find_element_by_header(doc, CHAPTER_INNER_CLASS)
 		Assert(err == nil, err)
 
+		// TODO some fictions bury the <p> tags in a nest of <div>'s???
+		// check number of sub elements, and if more than 3 or something, do it...
+
 		for _, i := range all_top_level_indices(doc, element) {
 			item := doc.all_elements[i]
 
