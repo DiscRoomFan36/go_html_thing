@@ -407,7 +407,7 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 		for _, i := range all_top_level_indices(doc, element) {
 			item := doc.all_elements[i]
 
-			fmt.Printf("item.class %s, len %d\n", item.class, num_sub_elements(item))
+			// fmt.Printf("item.class %s, len %d\n", item.class, num_sub_elements(item))
 
 			if item.class != "p" {
 				fmt.Printf("theres a non <p> block at %d, skipping\n", i)
@@ -416,26 +416,11 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 
 			// fmt.Printf("%d -> %s\n", i, item.class)
 
+			// this is incorrect... missing things not in spans... move more into thing below and remove recursion
 			for _, sub_ele_i := range all_top_level_indices(doc, item) {
 				sub_ele := doc.all_elements[sub_ele_i]
 
-				switch sub_ele.class {
-				case "span":
-					{
-						out_put_markdown_text.WriteString(sub_ele.all_subtext)
-					}
-				case "em":
-					{
-						Assert(num_sub_elements(sub_ele) == 1, "em tag is italics, should only contain one class")
-						out_put_markdown_text.WriteString("*")
-						out_put_markdown_text.WriteString(doc.all_elements[sub_ele.own_index+1].all_subtext)
-						out_put_markdown_text.WriteString("*")
-					}
-				default:
-					{
-						fmt.Printf("Unknown class found, %s\n", sub_ele.class)
-					}
-				}
+				html_subclass_to_markdown_text(doc, sub_ele, &out_put_markdown_text)
 			}
 
 			out_put_markdown_text.WriteString("\n\n")
@@ -443,4 +428,36 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 	}
 
 	return out_put_markdown_text.String()
+}
+
+func html_subclass_to_markdown_text(doc HTML_Document, sub HTML_SubClass, output *strings.Builder) {
+	// TODO handle dumb html things like "&nbsp;"
+	// TODO remove recursion. i just don't like recursion that much
+
+	switch sub.class {
+	case "span":
+		Assert(num_sub_elements(sub) == 0, "spans can only contain text...")
+		output.WriteString(sub.all_subtext)
+
+	case "em":
+		output.WriteString("*")
+		if num_sub_elements(sub) == 0 {
+			output.WriteString(sub.all_subtext)
+		} else {
+			html_subclass_to_markdown_text(doc, doc.all_elements[sub.own_index+1], output)
+		}
+		output.WriteString("*")
+
+	case "strong":
+		output.WriteString("**")
+		if num_sub_elements(sub) == 0 {
+			output.WriteString(sub.all_subtext)
+		} else {
+			html_subclass_to_markdown_text(doc, doc.all_elements[sub.own_index+1], output)
+		}
+		output.WriteString("**")
+
+	default:
+		fmt.Printf("Unknown class found, %s\n", sub.class)
+	}
 }
