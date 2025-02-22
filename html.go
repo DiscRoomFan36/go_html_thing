@@ -237,7 +237,7 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 				subclass_stack = append(subclass_stack, new_helper)
 			} else {
 				new_helper.sub.all_subtext = document[k+1 : k+1]
-				new_helper.sub.final_index = int64(len(subclass_stack))
+				new_helper.sub.final_index = int64(len(html_doc.all_elements))
 			}
 
 			if class_tag == "script" {
