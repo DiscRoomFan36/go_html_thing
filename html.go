@@ -50,6 +50,17 @@ type HTML_SubClass struct {
 	final_index int64
 }
 
+func is_alpha(c byte) bool {
+	if 'a' <= c && c <= 'z' {
+		return true
+	}
+	if 'A' <= c && c <= 'Z' {
+		return true
+	}
+
+	return false
+}
+
 func is_alphanumeric(c byte) bool {
 	if 'a' <= c && c <= 'z' {
 		return true
@@ -387,17 +398,24 @@ func (doc HTML_Document) get_fiction_title_from_chapter() string {
 	return title_text.all_subtext
 }
 
+func reverse[T any](array []T) {
+	for i := 0; i < len(array)/2; i++ {
+		j := len(array) - 1 - i
+		array[i], array[j] = array[j], array[i]
+	}
+}
+
 func (doc HTML_Document) rr_chapter_to_markdown() string {
 	const CHAPTER_INNER_CLASS = "<div class=\"chapter-inner chapter-content\">"
 
 	Assert(doc.is_rr_chapter(), "must be a rr chapter")
 
-	out_put_markdown_text := strings.Builder{}
+	output_markdown_text := strings.Builder{}
 
 	{ // Deal with the Title
-		out_put_markdown_text.WriteString("# ")
-		out_put_markdown_text.WriteString(doc.get_chapter_title())
-		out_put_markdown_text.WriteString("\n")
+		output_markdown_text.WriteString("# ")
+		output_markdown_text.WriteString(doc.get_chapter_title())
+		output_markdown_text.WriteString("\n")
 	}
 
 	{ // Do the Body of the chapter
@@ -407,30 +425,151 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 		// TODO some fictions bury the <p> tags in a nest of <div>'s???
 		// check number of sub elements, and if more than 3 or something, do it...
 
-		for _, i := range all_top_level_indices(doc, element) {
+		// were gonna treat this as a stack, to handle some weird case
+		// where we need to add more elements to this array
+		top_level_indices := all_top_level_indices(doc, element)
+		reverse(top_level_indices)
+
+		var i int
+		for len(top_level_indices) > 0 {
+			top_level_indices, i = pop(top_level_indices)
+			// for _, i := range top_level_indices {
+
 			item := doc.all_elements[i]
 
 			// fmt.Printf("item.class %s, len %d\n", item.class, num_sub_elements(item))
 
 			if item.class != "p" {
 				fmt.Printf("theres a non <p> block at %d, skipping\n", i)
+
+				if num_sub_elements(item) > 5 {
+					fmt.Printf("actually... this entry seems fishy, going deeper\n")
+
+					// something fishy is going on
+					// we want to print this new thing...
+					// but beware of the order your doing things, we want this to happen first
+
+					// get child classes
+					fishy_elements := all_top_level_indices(doc, item)
+					// reverse to match the 'top_level_indices' array
+					reverse(fishy_elements)
+
+					top_level_indices = append(top_level_indices, fishy_elements...)
+				}
+
 				continue
 			}
 
 			// fmt.Printf("%d -> %s\n", i, item.class)
 
+			html_subclass_to_markdown_text(doc, item, &output_markdown_text)
+
 			// this is incorrect... missing things not in spans... move more into thing below and remove recursion
-			for _, sub_ele_i := range all_top_level_indices(doc, item) {
-				sub_ele := doc.all_elements[sub_ele_i]
+			// for _, sub_ele_i := range all_top_level_indices(doc, item) {
+			// 	sub_ele := doc.all_elements[sub_ele_i]
 
-				html_subclass_to_markdown_text(doc, sub_ele, &out_put_markdown_text)
-			}
+			// 	html_subclass_to_markdown_text(doc, sub_ele, &output_markdown_text)
+			// }
 
-			out_put_markdown_text.WriteString("\n\n")
+			output_markdown_text.WriteString("\n\n")
 		}
 	}
 
-	return out_put_markdown_text.String()
+	return output_markdown_text.String()
+}
+
+// turn "</p class='bobber'>" into "p"
+func get_class_name_from_heading_tag(tag string) string {
+	Assert(tag[0] == '<', "must be valid tag")
+
+	i := 1
+	if tag[i] == '/' {
+		i += 1
+	}
+	start := i
+
+	for i < len(tag) && is_alpha(tag[i]) {
+		i += 1
+	}
+	Assert(i < len(tag), "must be a valid tag, ran of the edge")
+
+	return tag[start:i]
+}
+
+// TODO finish
+// TODO finish
+// TODO finish
+// TODO finish
+// TODO finish
+func get_all_un_tagged_text_in_all_subtext(sub HTML_SubClass) []string {
+	result := make([]string, 0)
+
+	base := 0
+	index := 0
+
+	for {
+		for index < len(sub.all_subtext) && sub.all_subtext[index] != '<' {
+			index += 1
+		}
+
+		// fmt.Printf("got a thing: |%s|\n", sub.all_subtext[index-5:index])
+
+		result = append(result, sub.all_subtext[base:index])
+
+		if index >= len(sub.all_subtext) {
+			// this means were past the end of the subtext, and can go home...
+			break
+		}
+
+		tag_start := index
+
+		// go past the <tag>
+		for index < len(sub.all_subtext) && sub.all_subtext[index] != '>' {
+			index += 1
+		}
+		Assert(index < len(sub.all_subtext), "must be true because parse_HTML was already run")
+
+		// check if this thing is one of the dumb ones...
+		tag_class := get_class_name_from_heading_tag(sub.all_subtext[tag_start : index+1])
+		if class_tag_is_one_of_the_dumb_ones(tag_class) {
+			// we can skip the thing
+			continue
+		}
+
+		// for dumb recursive text... should have just hade the HTML thing handle all this...
+		depth := 1
+
+		// now find the end of this block, while respecting sub tags of the same name...
+		for index < len(sub.all_subtext) {
+			for index < len(sub.all_subtext) && sub.all_subtext[index] != '<' {
+				index += 1
+			}
+			Assert(index < len(sub.all_subtext), "must be true because parse_HTML was already run")
+
+			end_tag := "</" + tag_class + ">"
+			recur_start_tag := "<" + tag_class
+
+			if sub.all_subtext[index:index+len(end_tag)] == end_tag {
+				// thats the end of the good tag
+				depth -= 1
+				index += len(end_tag)
+				if depth == 0 {
+					break
+				}
+			} else if sub.all_subtext[index:index+len(recur_start_tag)] == recur_start_tag {
+				depth += 1
+				index += len(recur_start_tag)
+				continue
+			}
+			index += 1
+		}
+
+		// Assert(index < len(sub.all_subtext), "i hope this doesn't break everything... maybe make this outer loop a while true loop")
+		// advance the base
+		base = index
+	}
+
+	return result
 }
 
 func html_subclass_to_markdown_text(doc HTML_Document, sub HTML_SubClass, output *strings.Builder) {
@@ -438,6 +577,23 @@ func html_subclass_to_markdown_text(doc HTML_Document, sub HTML_SubClass, output
 	// TODO remove recursion. i just don't like recursion that much
 
 	switch sub.class {
+	case "p":
+		// the p element can hold a-lot of text, or no text...
+		// were doing some kinda silly things to pick up on that
+		// but it works! maybe!
+
+		true_text := get_all_un_tagged_text_in_all_subtext(sub)
+		sub_elements_indices := all_top_level_indices(doc, sub)
+		Assert(len(true_text) == len(sub_elements_indices)+1, "this is how this thing should work...")
+
+		output.WriteString(true_text[0])
+		for i, sub_ele_i := range sub_elements_indices {
+			sub_ele := doc.all_elements[sub_ele_i]
+			html_subclass_to_markdown_text(doc, sub_ele, output)
+
+			output.WriteString(true_text[i+1])
+		}
+
 	case "span":
 		Assert(num_sub_elements(sub) == 0, "spans can only contain text...")
 		output.WriteString(sub.all_subtext)
