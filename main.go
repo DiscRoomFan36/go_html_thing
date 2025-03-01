@@ -37,12 +37,15 @@ func split_once(s string, sep string) (string, string, bool) {
 	return split[0], split[1], true
 }
 
+type RR_Fiction_Identifier string
+type RR_Chapter_Identifier string
+
 type Royal_Ident struct {
-	fiction_ident string
-	chapter_ident string
+	fiction_ident RR_Fiction_Identifier
+	chapter_ident RR_Chapter_Identifier
 }
 
-func parse_RoyalRoad_url_to_canonical(url string) Royal_Ident {
+func parse_RoyalRoad_chapter_url_to_canonical(url string) Royal_Ident {
 	Assert(url != "", "do not pass in the empty string")
 
 	const URL_PREFIX = "https://www.royalroad.com/fiction/"
@@ -68,8 +71,8 @@ func parse_RoyalRoad_url_to_canonical(url string) Royal_Ident {
 	chapter_ident := url
 
 	return Royal_Ident{
-		fiction_ident: fiction_ident,
-		chapter_ident: chapter_ident,
+		fiction_ident: RR_Fiction_Identifier(fiction_ident),
+		chapter_ident: RR_Chapter_Identifier(chapter_ident),
 	}
 }
 
@@ -105,7 +108,7 @@ func make_folder_if_not_exists(name string) error {
 }
 
 func get_url_or_cached(url string) string {
-	royal_ident := parse_RoyalRoad_url_to_canonical(url)
+	royal_ident := parse_RoyalRoad_chapter_url_to_canonical(url)
 
 	// make the cache if it doesn't exist
 	err := make_folder_if_not_exists(CACHED_FOLDER_NAME)
@@ -140,23 +143,89 @@ func get_url_or_cached(url string) string {
 	}
 }
 
+// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
+// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
+const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai"
+
+// have this take a Royal_Ident instead?
+func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []Royal_Ident {
+	url := "https://www.royalroad.com/fiction/" + string(fi)
+
+	// we can't cache this because it changes all the time. and we want to get new updates
+	body := get_html_from_url(url)
+
+	doc, err := parse_HTML_Document(body)
+	Assert(err == nil, err)
+
+	const TABLE_BODY_TAG = "<tbody>"
+	const CORRECT_TABLE_ELEMENT_ELEMENTS = 5
+
+	table, err := find_element_by_header(doc, TABLE_BODY_TAG)
+	Assert(err == nil, err)
+
+	results := make([]Royal_Ident, 0)
+
+	table_element_indexes := all_top_level_indices(doc, table)
+	for _, t_index := range table_element_indexes {
+		table_element := doc.all_elements[t_index]
+
+		{ // check for errors
+			Assert(table_element.class == "tr", "the elements don't look right wanted 'tr'")
+
+			sub_elements := num_sub_elements(table_element)
+			error_text := fmt.Sprintf("this table element dose not look right, has %d want %d", sub_elements, CORRECT_TABLE_ELEMENT_ELEMENTS)
+			Assert(num_sub_elements(table_element) == CORRECT_TABLE_ELEMENT_ELEMENTS, error_text)
+		}
+
+		const START_DATA_URL = "data-url=\""
+
+		data_url_index := strings.Index(table_element.all_subtext, START_DATA_URL)
+		Assert(data_url_index != -1, "subtext must contain DATA_URL")
+
+		start_of_url := table_element.all_subtext[data_url_index+len(START_DATA_URL):]
+		Assert(start_of_url[0] == '/', "hope I moved right")
+
+		end_of_string := strings.Index(start_of_url, "\"")
+		Assert(data_url_index != -1, "missing end of string")
+
+		data_url := start_of_url[:end_of_string]
+
+		next_chapter_ident := parse_RoyalRoad_chapter_url_to_canonical("https://www.royalroad.com" + data_url)
+
+		results = append(results, next_chapter_ident)
+	}
+
+	return results
+}
+
 func main() {
+	{
+		// this must not be from the get_url_or_cached, as it isn't a chapter
+		fiction_body := get_html_from_url(test_url)
+
+		dump_string(fiction_body, "bog_pag.html")
+
+		// html_doc, err := parse_HTML_Document(fiction_body)
+		// Assert(err == nil, err)
+		// html_doc.original_url = test_url
+	}
+
+	return
+
 	rr_if, err := get_info_storage()
 	Assert(err == nil, err)
 	defer save_info_storage(rr_if)
 	fmt.Printf("rr_if: %v\n", rr_if)
 
-	// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
-	// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
-	const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
-
 	body := get_url_or_cached(test_url)
 
-	html_doc, err := parse_HTML_Document(string(body))
+	html_doc, err := parse_HTML_Document(body)
 	Assert(err == nil, err)
+	// TODO put this in a separate struct...
 	html_doc.original_url = test_url
 
-	rr_ident := parse_RoyalRoad_url_to_canonical(html_doc.original_url)
+	rr_ident := parse_RoyalRoad_chapter_url_to_canonical(html_doc.original_url)
 
 	{ // set the rr_if info to the correct thing
 		_, exist_fiction := rr_if.fiction_ident_to_titles[rr_ident.fiction_ident]

@@ -20,10 +20,10 @@ const PARSER_FICTION_TAG = "FICTION"
 const PARSER_CHAPTER_TAG = "CHAPTER"
 
 type RoyalRoad_Info_Storage struct {
-	fiction_ident_to_titles map[string]string
+	fiction_ident_to_titles map[RR_Fiction_Identifier]string
 
 	// i think the chapters are unique as well...
-	chapter_ident_to_titles map[string]string
+	chapter_ident_to_titles map[RR_Chapter_Identifier]string
 }
 
 func get_info_storage() (RoyalRoad_Info_Storage, error) {
@@ -32,8 +32,8 @@ func get_info_storage() (RoyalRoad_Info_Storage, error) {
 	}
 
 	result := RoyalRoad_Info_Storage{
-		fiction_ident_to_titles: make(map[string]string),
-		chapter_ident_to_titles: make(map[string]string),
+		fiction_ident_to_titles: make(map[RR_Fiction_Identifier]string),
+		chapter_ident_to_titles: make(map[RR_Chapter_Identifier]string),
 	}
 
 	{ // if the file dose not exist, create a empty file
@@ -115,9 +115,9 @@ func get_info_storage() (RoyalRoad_Info_Storage, error) {
 
 			switch selection {
 			case PARSER_FICTION_TAG:
-				result.fiction_ident_to_titles[ident] = name
+				result.fiction_ident_to_titles[RR_Fiction_Identifier(ident)] = name
 			case PARSER_CHAPTER_TAG:
-				result.chapter_ident_to_titles[ident] = name
+				result.chapter_ident_to_titles[RR_Chapter_Identifier(ident)] = name
 
 			default:
 				error_text := fmt.Sprintf("%s:%d: unknown selection '%s'found on line: {%s}", RR_INFO_STORE_FILEPATH, line_number, selection, line)
@@ -142,7 +142,7 @@ func save_info_storage(rr_if RoyalRoad_Info_Storage) error {
 
 	for ident, name := range rr_if.fiction_ident_to_titles {
 		data.WriteString(PARSER_FICTION_TAG + PARSER_SEPARATOR_FIRST)
-		data.WriteString(ident)
+		data.WriteString(string(ident))
 		data.WriteString(PARSER_SEPARATOR_SECOND)
 		data.WriteString(name)
 		data.WriteString("\n")
@@ -152,7 +152,7 @@ func save_info_storage(rr_if RoyalRoad_Info_Storage) error {
 
 	for ident, name := range rr_if.chapter_ident_to_titles {
 		data.WriteString(PARSER_CHAPTER_TAG + PARSER_SEPARATOR_FIRST)
-		data.WriteString(ident)
+		data.WriteString(string(ident))
 		data.WriteString(PARSER_SEPARATOR_SECOND)
 		data.WriteString(name)
 		data.WriteString("\n")
