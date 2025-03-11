@@ -269,7 +269,9 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER)
 			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER + rr_if.fiction_ident_to_titles[rr_ident.fiction_ident])
 
-			out_filename := fmt.Sprintf(MARKDOWN_OUTPUT_FOLDER+"%s/%s.md", rr_if.fiction_ident_to_titles[rr_ident.fiction_ident], rr_if.chapter_ident_to_titles[rr_ident.chapter_ident])
+			fiction_name := rr_if.fiction_ident_to_titles[rr_ident.fiction_ident]
+			chapter_name := rr_if.chapter_ident_to_titles[rr_ident.chapter_ident]
+			out_filename := fmt.Sprintf("%s%s/%s.md", MARKDOWN_OUTPUT_FOLDER, fiction_name, chapter_name)
 			dump_string(rr_chapter_markdown, out_filename)
 		}
 		context_indent -= 4
