@@ -40,7 +40,7 @@ func get_html_from_url(url string) string {
 	body, err := io.ReadAll(resp.Body)
 	Assert(err == nil, err)
 
-	log("finished loading: %s", url)
+	log("Finished loading: %s", url)
 
 	return string(body)
 }
@@ -282,11 +282,10 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 }
 
 func main() {
-	// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
-	// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
-	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
-	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai"
-	const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
+	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
+	const test_url = "https://www.royalroad.com/fiction/79173/downtown-druid"
+
+	// TODO make this a command line program
 
 	ident := parse_RoyalRoad_url_to_fiction(test_url)
 	all_chapters_from_fiction_to_markdown(ident)
