@@ -61,34 +61,24 @@ type Royal_Ident struct {
 	chapter_ident RR_Chapter_Identifier
 }
 
+func parse_RoyalRoad_url_to_fiction(url string) RR_Fiction_Identifier {
+	_, rest, ok := split_once(url, "fiction/")
+	Assert(ok, "url must contain 'fiction/'", url)
+	fiction, _, _ := split_once(rest, "/")
+	return RR_Fiction_Identifier(fiction)
+}
+
+func parse_RoyalRoad_url_to_chapter(url string) RR_Chapter_Identifier {
+	_, rest, ok := split_once(url, "chapter/")
+	Assert(ok, "url must contain 'chapter/'", url)
+	chapter, _, _ := split_once(rest, "/")
+	return RR_Chapter_Identifier(chapter)
+}
+
 func parse_RoyalRoad_chapter_url_to_canonical(url string) Royal_Ident {
-	Assert(url != "", "do not pass in the empty string")
-
-	const URL_PREFIX = "https://www.royalroad.com/fiction/"
-	url, ok := strings.CutPrefix(url, URL_PREFIX)
-	Assert(ok, "url must start with prefix")
-
-	fiction_ident, url, ok := split_once(url, "/")
-	Assert(ok, "was not ok")
-
-	for !strings.HasPrefix(url, "chapter/") {
-		_, url, ok = split_once(url, "/")
-		Assert(ok, "was not ok")
-	}
-
-	_, url, ok = split_once(url, "/")
-	Assert(ok, "was not ok")
-
-	// now it has a number, then maybe another slash and chapter name
-	if strings.Contains(url, "/") {
-		url = url[:strings.Index(url, "/")]
-	}
-
-	chapter_ident := url
-
 	return Royal_Ident{
-		fiction_ident: RR_Fiction_Identifier(fiction_ident),
-		chapter_ident: RR_Chapter_Identifier(chapter_ident),
+		fiction_ident: parse_RoyalRoad_url_to_fiction(url),
+		chapter_ident: parse_RoyalRoad_url_to_chapter(url),
 	}
 }
 
@@ -296,9 +286,9 @@ func main() {
 	// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
 	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
 	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai"
-	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
+	const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
 
-	ident := RR_Fiction_Identifier("107017")
+	ident := parse_RoyalRoad_url_to_fiction(test_url)
 	all_chapters_from_fiction_to_markdown(ident)
 }
 

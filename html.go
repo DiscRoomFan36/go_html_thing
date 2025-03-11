@@ -5,8 +5,9 @@ import (
 	"strings"
 )
 
-func Assert(b bool, reason any) {
+func Assert(b bool, reason any, to_print ...any) {
 	if !b {
+		println(to_print)
 		panic(reason)
 	}
 }
