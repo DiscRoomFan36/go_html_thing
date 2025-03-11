@@ -2,12 +2,15 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
 func Assert(b bool, reason any, to_print ...any) {
 	if !b {
-		println(to_print)
+		for _, v := range to_print {
+			fmt.Printf("%+v\n", v)
+		}
 		panic(reason)
 	}
 }
@@ -603,7 +606,10 @@ func html_subclass_to_markdown_text(doc HTML_Document, sub HTML_SubClass, output
 		}
 
 	case "span":
-		Assert(num_sub_elements(sub) == 0, "spans can only contain text...")
+		// Assert(num_sub_elements(sub) == 0, "spans can only contain text...", sub)
+		if num_sub_elements(sub) != 0 {
+			log("span contains %d sub elements, lets hope their only <br's>", num_sub_elements(sub))
+		}
 		output.WriteString(sub.all_subtext)
 
 	case "em":
