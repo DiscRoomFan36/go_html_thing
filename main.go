@@ -10,6 +10,18 @@ import (
 	"strings"
 )
 
+var context_indent = 0
+
+func log(format string, a ...any) {
+	Assert(context_indent >= 0, "context indent was negative")
+
+	for i := 0; i < context_indent; i++ {
+		fmt.Printf(" ")
+	}
+	fmt.Printf(format, a...)
+	fmt.Printf("\n")
+}
+
 func dump_string(s string, filename string) error {
 	f, err := os.Create(filename)
 	Assert(err == nil, err)
@@ -19,12 +31,16 @@ func dump_string(s string, filename string) error {
 }
 
 func get_html_from_url(url string) string {
+	log("Loading url: %s", url)
+
 	resp, err := http.Get(url)
 	Assert(err == nil, err)
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	Assert(err == nil, err)
+
+	log("finished loading: %s", url)
 
 	return string(body)
 }
@@ -120,7 +136,7 @@ func get_url_or_cached(url string) string {
 	Assert(err == nil, err)
 	if exist {
 		if DEBUG_PRINT_URL_OR_CACHE {
-			fmt.Printf("Using cache!\n")
+			log("Using cache!")
 		}
 
 		// read from the file
@@ -130,7 +146,7 @@ func get_url_or_cached(url string) string {
 
 	} else {
 		if DEBUG_PRINT_URL_OR_CACHE {
-			fmt.Printf("URL is not cached. caching %s\n", url)
+			log("URL is not cached. caching %s", url)
 		}
 
 		// download from the internet
@@ -143,13 +159,8 @@ func get_url_or_cached(url string) string {
 	}
 }
 
-// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
-// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
-// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
-const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai"
-
 // have this take a Royal_Ident instead?
-func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []Royal_Ident {
+func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []string {
 	url := "https://www.royalroad.com/fiction/" + string(fi)
 
 	// we can't cache this because it changes all the time. and we want to get new updates
@@ -164,7 +175,7 @@ func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []Royal_Iden
 	table, err := find_element_by_header(doc, TABLE_BODY_TAG)
 	Assert(err == nil, err)
 
-	results := make([]Royal_Ident, 0)
+	results := make([]string, 0)
 
 	table_element_indexes := all_top_level_indices(doc, table)
 	for _, t_index := range table_element_indexes {
@@ -180,10 +191,10 @@ func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []Royal_Iden
 
 		const START_DATA_URL = "data-url=\""
 
-		data_url_index := strings.Index(table_element.all_subtext, START_DATA_URL)
+		data_url_index := strings.Index(table_element.heading_tag, START_DATA_URL)
 		Assert(data_url_index != -1, "subtext must contain DATA_URL")
 
-		start_of_url := table_element.all_subtext[data_url_index+len(START_DATA_URL):]
+		start_of_url := table_element.heading_tag[data_url_index+len(START_DATA_URL):]
 		Assert(start_of_url[0] == '/', "hope I moved right")
 
 		end_of_string := strings.Index(start_of_url, "\"")
@@ -191,72 +202,104 @@ func rr_fiction_ident_to_list_of_chapters(fi RR_Fiction_Identifier) []Royal_Iden
 
 		data_url := start_of_url[:end_of_string]
 
-		next_chapter_ident := parse_RoyalRoad_chapter_url_to_canonical("https://www.royalroad.com" + data_url)
-
-		results = append(results, next_chapter_ident)
+		results = append(results, "https://www.royalroad.com"+data_url)
 	}
 
 	return results
 }
 
-func main() {
-	{
-		// this must not be from the get_url_or_cached, as it isn't a chapter
-		fiction_body := get_html_from_url(test_url)
-
-		dump_string(fiction_body, "bog_pag.html")
-
-		// html_doc, err := parse_HTML_Document(fiction_body)
-		// Assert(err == nil, err)
-		// html_doc.original_url = test_url
-	}
-
-	return
-
+func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
+	log("loading info store")
+	context_indent += 4
 	rr_if, err := get_info_storage()
 	Assert(err == nil, err)
-	defer save_info_storage(rr_if)
-	fmt.Printf("rr_if: %v\n", rr_if)
+	context_indent -= 4
 
-	body := get_url_or_cached(test_url)
+	saved_indent := context_indent
+	defer func() {
+		context_indent = saved_indent
+		save_info_storage(rr_if)
+	}()
 
-	html_doc, err := parse_HTML_Document(body)
-	Assert(err == nil, err)
-	// TODO put this in a separate struct...
-	html_doc.original_url = test_url
+	log("getting the chapters")
+	context_indent += 4
+	chapters := rr_fiction_ident_to_list_of_chapters(fiction)
+	context_indent -= 4
 
-	rr_ident := parse_RoyalRoad_chapter_url_to_canonical(html_doc.original_url)
+	log("turning chapters to markdown")
+	context_indent += 4
+	for i, chapter := range chapters {
+		log("%03d/%03d -> %s", i+1, len(chapters), chapter)
+		context_indent += 4
 
-	{ // set the rr_if info to the correct thing
-		_, exist_fiction := rr_if.fiction_ident_to_titles[rr_ident.fiction_ident]
-		if !exist_fiction {
-			fmt.Printf("New Fiction found!\n")
-			rr_if.fiction_ident_to_titles[rr_ident.fiction_ident] = html_doc.get_fiction_title_from_chapter()
+		body := get_url_or_cached(chapter)
+
+		log("parsing html")
+		context_indent += 4
+		html_doc, err := parse_HTML_Document(body)
+		Assert(err == nil, err)
+		rr_chapter := Royal_Road_Chapter{
+			original_url: chapter,
+			doc:          html_doc,
 		}
+		context_indent -= 4
 
-		_, exist_chapter := rr_if.chapter_ident_to_titles[rr_ident.chapter_ident]
-		if !exist_chapter {
-			fmt.Printf("New chapter found!\n")
-			rr_if.chapter_ident_to_titles[rr_ident.chapter_ident] = html_doc.get_chapter_title()
+		rr_ident := parse_RoyalRoad_chapter_url_to_canonical(rr_chapter.original_url)
+
+		context_indent += 4
+		{ // set the rr_if info to the correct thing
+			_, exist_fiction := rr_if.fiction_ident_to_titles[rr_ident.fiction_ident]
+			if !exist_fiction {
+				log("New Fiction found!")
+				rr_if.fiction_ident_to_titles[rr_ident.fiction_ident] = rr_chapter.get_fiction_title_from_chapter()
+			}
+
+			_, exist_chapter := rr_if.chapter_ident_to_titles[rr_ident.chapter_ident]
+			if !exist_chapter {
+				log("New chapter found!")
+				rr_if.chapter_ident_to_titles[rr_ident.chapter_ident] = rr_chapter.get_chapter_title()
+			}
 		}
+		context_indent -= 4
+
+		log("converting to markdown")
+		context_indent += 4
+		rr_chapter_markdown := rr_chapter.to_markdown()
+		context_indent -= 4
+
+		log("saving to file")
+		context_indent += 4
+		{ // put the markdown into its proper place
+
+			const MARKDOWN_OUTPUT_FOLDER = "./markdown/"
+
+			Assert(contains(rr_if.fiction_ident_to_titles, rr_ident.fiction_ident), "no fiction ident in rr_if, impossible")
+			Assert(contains(rr_if.chapter_ident_to_titles, rr_ident.chapter_ident), "no chapter ident in rr_if, impossible")
+
+			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER)
+			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER + rr_if.fiction_ident_to_titles[rr_ident.fiction_ident])
+
+			out_filename := fmt.Sprintf(MARKDOWN_OUTPUT_FOLDER+"%s/%s.md", rr_if.fiction_ident_to_titles[rr_ident.fiction_ident], rr_if.chapter_ident_to_titles[rr_ident.chapter_ident])
+			dump_string(rr_chapter_markdown, out_filename)
+		}
+		context_indent -= 4
+
+		context_indent -= 4
 	}
+	context_indent -= 4
 
-	rr_chapter_markdown := html_doc.rr_chapter_to_markdown()
+	log("finished successfully!")
+}
 
-	{ // put the markdown into its proper place
-		const MARKDOWN_OUTPUT_FOLDER = "./markdown/"
+func main() {
+	// const test_url = "https://www.royalroad.com/fiction/72359/cartaflore/chapter/2059865/chapter-174-honest-red-reflection"
+	// const test_url = "https://www.royalroad.com/fiction/84669/heavenly-shae/chapter/2078862/manifold-journey-71-merchant-xio"
+	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai/chapter/2077033/book-4-chapter-29"
+	// const test_url = "https://www.royalroad.com/fiction/69512/bog-standard-isekai"
+	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
 
-		Assert(contains(rr_if.fiction_ident_to_titles, rr_ident.fiction_ident), "no fiction ident in rr_if, impossible")
-		Assert(contains(rr_if.chapter_ident_to_titles, rr_ident.chapter_ident), "no chapter ident in rr_if, impossible")
-
-		make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER)
-		make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER + rr_if.fiction_ident_to_titles[rr_ident.fiction_ident])
-
-		out_filename := fmt.Sprintf(MARKDOWN_OUTPUT_FOLDER+"%s/%s.md", rr_if.fiction_ident_to_titles[rr_ident.fiction_ident], rr_if.chapter_ident_to_titles[rr_ident.chapter_ident])
-		dump_string(rr_chapter_markdown, out_filename)
-	}
-
-	print("Its all Good!\n")
+	ident := RR_Fiction_Identifier("107017")
+	all_chapters_from_fiction_to_markdown(ident)
 }
 
 func contains[T comparable, U any](m map[T]U, key T) bool {

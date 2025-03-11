@@ -28,7 +28,7 @@ type RoyalRoad_Info_Storage struct {
 
 func get_info_storage() (RoyalRoad_Info_Storage, error) {
 	if DEBUG_PRINT_EASY_PARSE_FILE {
-		fmt.Printf("Getting info storage\n")
+		log("Getting info storage")
 	}
 
 	result := RoyalRoad_Info_Storage{
@@ -131,7 +131,7 @@ func get_info_storage() (RoyalRoad_Info_Storage, error) {
 
 func save_info_storage(rr_if RoyalRoad_Info_Storage) error {
 	if DEBUG_PRINT_EASY_PARSE_FILE {
-		fmt.Printf("Saving info storage\n")
+		log("Saving info storage")
 	}
 
 	data := strings.Builder{}

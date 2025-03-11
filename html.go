@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -13,10 +12,6 @@ func Assert(b bool, reason any) {
 }
 
 type HTML_Document struct {
-	// this is not set in the parse HTML function,
-	// please set it at your own convenience
-	original_url string
-
 	// contains the bytes or string that is the entire HTML doc
 	original_string string
 
@@ -103,14 +98,23 @@ func pop[T any](array []T) ([]T, T) {
 }
 
 func class_tag_is_one_of_the_dumb_ones(class_tag string) bool {
-	// NOTE <br> is actually a line break...
-	// NOTE <hr> is some header thing...
-	var AUTO_VOID_TAGS = [...]string{"meta", "link", "img", "input", "br", "hr"}
-	for _, tag := range AUTO_VOID_TAGS {
-		if tag == class_tag {
-			return true
-		}
+	switch class_tag {
+	case "meta":
+		return true
+	case "link":
+		return true
+	case "img":
+		return true
+	case "input":
+		return true
+	case "br": // NOTE <br> is actually a line break...
+		return true
+	case "hr": // NOTE <hr> is some header thing...
+		return true
+	case "partial":
+		return true
 	}
+
 	return false
 }
 
@@ -188,7 +192,7 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 			j += 1
 		}
 		Assert(j < len(document), "malformed div")
-		// fmt.Printf("{%c} -> {%s}\n", document[j], document[j-5:j+5])
+		// log("{%c} -> {%s}", document[j], document[j-5:j+5])
 		Assert(is_whitespace(document[j]) || document[j] == '>' || document[j] == '/', "must be followed by whitespace or '>' OR '/'")
 
 		heading_base := index + 1
@@ -281,8 +285,8 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 			}
 
 		} else {
-			// fmt.Printf("class tag: %s\n", class_tag)
-			// fmt.Printf("last  tag: %s\n", subclass_stack[len(subclass_stack)-1].sub.class)
+			// log("class tag: %s", class_tag)
+			// log("last  tag: %s", subclass_stack[len(subclass_stack)-1].sub.class)
 
 			if class_tag_is_one_of_the_dumb_ones(class_tag) {
 				// HTML Sucks Ass
@@ -297,7 +301,7 @@ func parse_HTML_Document(document string) (HTML_Document, error) {
 				// go pointers are stupid...
 				real_item := &html_doc.all_elements[item.sub.own_index]
 
-				// fmt.Printf("start_text_index: %d\n", item.start_text_index)
+				// log("start_text_index: %d", item.start_text_index)
 
 				real_item.final_index = int64(len(html_doc.all_elements))
 				real_item.all_subtext = document[item.start_text_index:index]
@@ -347,27 +351,33 @@ func all_top_level_indices(doc HTML_Document, element HTML_SubClass) []int {
 //           Royal Road Stuff
 // -------------------------------------
 
-func (doc HTML_Document) is_royal_road_link() bool {
-	if doc.original_url == "" {
+type Royal_Road_Chapter struct {
+	original_url string
+
+	doc HTML_Document
+}
+
+func (rr_chapter Royal_Road_Chapter) is_royal_road_link() bool {
+	if rr_chapter.original_url == "" {
 		panic("did not set url before calling this function!!!")
 	}
 
-	if strings.HasPrefix(doc.original_url, "https://www.royalroad.com") {
+	if strings.HasPrefix(rr_chapter.original_url, "https://www.royalroad.com") {
 		return true
 	}
 	return false
 }
 
-func (doc HTML_Document) is_rr_chapter() bool {
-	if doc.original_url == "" {
+func (rr_chapter Royal_Road_Chapter) is_rr_chapter() bool {
+	if rr_chapter.original_url == "" {
 		panic("did not set url before calling this function!!!")
 	}
 
-	if !doc.is_royal_road_link() {
+	if !rr_chapter.is_royal_road_link() {
 		return false
 	}
 
-	_, right, ok := split_once(doc.original_string, "chapter/")
+	_, right, ok := split_once(rr_chapter.doc.original_string, "chapter/")
 	if ok {
 		Assert(len(right) > 0, "invalid link")
 		return true
@@ -376,23 +386,23 @@ func (doc HTML_Document) is_rr_chapter() bool {
 	return false
 }
 
-func (doc HTML_Document) get_chapter_title() string {
-	Assert(doc.is_rr_chapter(), "HTML must be a royal road chapter link")
+func (rr_chapter Royal_Road_Chapter) get_chapter_title() string {
+	Assert(rr_chapter.is_rr_chapter(), "HTML must be a royal road chapter link")
 
 	// royal road header class. might break...
 	const HEADER_CLASS = "<h1 style=\"margin-top: 10px\" class=\"font-white break-word\">"
-	title_text, err := find_element_by_header(doc, HEADER_CLASS)
+	title_text, err := find_element_by_header(rr_chapter.doc, HEADER_CLASS)
 	Assert(err == nil, err)
 
 	return title_text.all_subtext
 }
 
-func (doc HTML_Document) get_fiction_title_from_chapter() string {
-	Assert(doc.is_rr_chapter(), "HTML must be a royal road chapter link")
+func (rr_chapter Royal_Road_Chapter) get_fiction_title_from_chapter() string {
+	Assert(rr_chapter.is_rr_chapter(), "HTML must be a royal road chapter link")
 
 	const FICTION_TITLE_CLASS = "<h2 style=\"font-size: 24px\" class=\"font-white inline-block\">"
 
-	title_text, err := find_element_by_header(doc, FICTION_TITLE_CLASS)
+	title_text, err := find_element_by_header(rr_chapter.doc, FICTION_TITLE_CLASS)
 	Assert(err == nil, err)
 
 	return title_text.all_subtext
@@ -405,16 +415,18 @@ func reverse[T any](array []T) {
 	}
 }
 
-func (doc HTML_Document) rr_chapter_to_markdown() string {
+func (rr_chapter Royal_Road_Chapter) to_markdown() string {
 	const CHAPTER_INNER_CLASS = "<div class=\"chapter-inner chapter-content\">"
 
-	Assert(doc.is_rr_chapter(), "must be a rr chapter")
+	Assert(rr_chapter.is_rr_chapter(), "must be a rr chapter")
+
+	doc := rr_chapter.doc
 
 	output_markdown_text := strings.Builder{}
 
 	{ // Deal with the Title
 		output_markdown_text.WriteString("# ")
-		output_markdown_text.WriteString(doc.get_chapter_title())
+		output_markdown_text.WriteString(rr_chapter.get_chapter_title())
 		output_markdown_text.WriteString("\n")
 	}
 
@@ -437,13 +449,13 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 
 			item := doc.all_elements[i]
 
-			// fmt.Printf("item.class %s, len %d\n", item.class, num_sub_elements(item))
+			// log("item.class %s, len %d", item.class, num_sub_elements(item))
 
 			if item.class != "p" {
-				fmt.Printf("theres a non <p> block at %d, skipping\n", i)
+				log("theres a non <p> block at %d, skipping", i)
 
 				if num_sub_elements(item) > 5 {
-					fmt.Printf("actually... this entry seems fishy, going deeper\n")
+					log("actually... this entry seems fishy, going deeper")
 
 					// something fishy is going on
 					// we want to print this new thing...
@@ -460,7 +472,7 @@ func (doc HTML_Document) rr_chapter_to_markdown() string {
 				continue
 			}
 
-			// fmt.Printf("%d -> %s\n", i, item.class)
+			// log("%d -> %s", i, item.class)
 
 			html_subclass_to_markdown_text(doc, item, &output_markdown_text)
 
@@ -496,11 +508,6 @@ func get_class_name_from_heading_tag(tag string) string {
 	return tag[start:i]
 }
 
-// TODO finish
-// TODO finish
-// TODO finish
-// TODO finish
-// TODO finish
 func get_all_un_tagged_text_in_all_subtext(sub HTML_SubClass) []string {
 	result := make([]string, 0)
 
@@ -512,7 +519,7 @@ func get_all_un_tagged_text_in_all_subtext(sub HTML_SubClass) []string {
 			index += 1
 		}
 
-		// fmt.Printf("got a thing: |%s|\n", sub.all_subtext[index-5:index])
+		// log("got a thing: |%s|", sub.all_subtext[index-5:index])
 
 		result = append(result, sub.all_subtext[base:index])
 
@@ -617,6 +624,6 @@ func html_subclass_to_markdown_text(doc HTML_Document, sub HTML_SubClass, output
 		output.WriteString("**")
 
 	default:
-		fmt.Printf("Unknown class found, %s\n", sub.class)
+		log("Unknown class found, %s", sub.class)
 	}
 }
