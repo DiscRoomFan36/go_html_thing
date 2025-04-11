@@ -283,17 +283,49 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 	log("finished successfully!")
 }
 
-func main() {
-	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
-	const test_url = "https://www.royalroad.com/fiction/79173/downtown-druid"
-
-	// TODO make this a command line program
-
-	ident := parse_RoyalRoad_url_to_fiction(test_url)
-	all_chapters_from_fiction_to_markdown(ident)
-}
-
 func contains[T comparable, U any](m map[T]U, key T) bool {
 	_, contains := m[key]
 	return contains
+}
+
+func usage(program_name string) {
+	fmt.Printf("TODO usage\n")
+	fmt.Printf("%s\n", program_name)
+}
+
+func main() {
+	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
+	// const test_url = "https://www.royalroad.com/fiction/79173/downtown-druid"
+
+	// TODO make this a command line program
+	args := os.Args
+	program_name := args[0]
+
+	if len(args) == 1 {
+		fmt.Printf("Expected an argument\n")
+		usage(program_name)
+		os.Exit(1)
+	}
+
+	command := args[1]
+
+	switch command {
+	case "help":
+		usage(program_name)
+		os.Exit(0)
+
+	case "downloadHTML":
+		fmt.Printf("TODO: DownloadHTML argument\n")
+		os.Exit(1)
+
+	default:
+		fmt.Printf("Unknown Command '%s'\n", command)
+		fmt.Printf("Use '%s help' to see usage\n", program_name)
+		os.Exit(1)
+	}
+
+	Assert(false, "UNREACHABLE")
+
+	// ident := parse_RoyalRoad_url_to_fiction(test_url)
+	// all_chapters_from_fiction_to_markdown(ident)
 }
