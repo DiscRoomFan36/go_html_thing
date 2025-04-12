@@ -308,6 +308,7 @@ func main() {
 	}
 
 	command := args[1]
+	rest := args[2:]
 
 	switch command {
 	case "help":
@@ -315,8 +316,18 @@ func main() {
 		os.Exit(0)
 
 	case "downloadHTML":
-		fmt.Printf("TODO: DownloadHTML argument\n")
-		os.Exit(1)
+		if len(rest) != 2 {
+			fmt.Printf("Incorrect number of arguments, download html expects 4 gave %v\n", len(args))
+			os.Exit(1)
+		}
+
+		site := get_html_from_url(rest[0])
+		err := dump_string(site, rest[1])
+		Assert(err == nil, err)
+
+		log("downloaded HTML url to file '%s'", rest[1])
+
+		os.Exit(0)
 
 	default:
 		fmt.Printf("Unknown Command '%s'\n", command)
