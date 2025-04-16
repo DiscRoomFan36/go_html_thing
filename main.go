@@ -315,17 +315,22 @@ func main() {
 		usage(program_name)
 		os.Exit(0)
 
-	case "downloadHTML":
-		if len(rest) != 2 {
-			fmt.Printf("Incorrect number of arguments, download html expects 4 gave %v\n", len(args))
+	case "html":
+		if len(rest) != 1 {
+			fmt.Printf("Incorrect number of arguments, download html expects 3 gave %v\n", len(args))
 			os.Exit(1)
 		}
 
-		site := get_html_from_url(rest[0])
-		err := dump_string(site, rest[1])
+		url := rest[0]
+
+		trimmed := strings.TrimPrefix(url, "https://")
+		filename := strings.Replace(trimmed, "/", "_", -1) + ".html"
+
+		site := get_html_from_url(url)
+		err := dump_string(site, filename)
 		Assert(err == nil, err)
 
-		log("downloaded HTML url to file '%s'", rest[1])
+		log("downloaded HTML url to file '%s'", filename)
 
 		os.Exit(0)
 
