@@ -62,6 +62,10 @@ type Royal_Ident struct {
 }
 
 func parse_RoyalRoad_url_to_fiction(url string) RR_Fiction_Identifier {
+	if !strings.HasPrefix(url, RR_URL_START) {
+		Assert(false, "url dose not start with "+RR_URL_START, "url = "+url)
+	}
+
 	_, rest, ok := split_once(url, "fiction/")
 	Assert(ok, "url must contain 'fiction/'", url)
 	fiction, _, _ := split_once(rest, "/")
@@ -69,13 +73,15 @@ func parse_RoyalRoad_url_to_fiction(url string) RR_Fiction_Identifier {
 }
 
 func parse_RoyalRoad_url_to_chapter(url string) RR_Chapter_Identifier {
+	if !strings.HasPrefix(url, RR_URL_START) {
+		Assert(false, "url dose not start with "+RR_URL_START, "url = "+url)
+	}
+
 	_, rest, ok := split_once(url, "chapter/")
 	Assert(ok, "url must contain 'chapter/'", url)
 	chapter, _, _ := split_once(rest, "/")
 	return RR_Chapter_Identifier(chapter)
 }
-
-const RR_URL_START = "https://www.royalroad.com"
 
 // TODO use status bools
 func parse_RoyalRoad_chapter_url_to_canonical(url string) Royal_Ident {
@@ -270,9 +276,6 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 
 			const MARKDOWN_OUTPUT_FOLDER = "./markdown/"
 
-			Assert(contains(rr_if.fiction_ident_to_titles, rr_ident.fiction_ident), "no fiction ident in rr_if, impossible")
-			Assert(contains(rr_if.chapter_ident_to_titles, rr_ident.chapter_ident), "no chapter ident in rr_if, impossible")
-
 			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER)
 			make_folder_if_not_exists(MARKDOWN_OUTPUT_FOLDER + rr_if.fiction_ident_to_titles[rr_ident.fiction_ident])
 
@@ -301,10 +304,6 @@ func usage(program_name string) {
 }
 
 func main() {
-	// const test_url = "https://www.royalroad.com/fiction/107017/mage-lord-isekai"
-	// const test_url = "https://www.royalroad.com/fiction/79173/downtown-druid"
-
-	// TODO make this a command line program
 	args := os.Args
 	program_name := args[0]
 
@@ -382,6 +381,26 @@ func main() {
 		dump_string(markdown, chapter_title)
 		fmt.Printf("downloaded royal road chapter to file '%s'\n", chapter_title)
 
+		os.Exit(0)
+
+	case "fiction":
+		if len(rest) != 1 {
+			fmt.Printf("Incorrect number of arguments, download chapter expects 3 gave %v\n", len(args))
+			os.Exit(1)
+		}
+
+		fmt.Printf("Downloading entire fiction from royal road url\n")
+
+		url := rest[0]
+		// this thing is gonna assert if the url is not RR,
+		fiction_ident := parse_RoyalRoad_url_to_fiction(url)
+
+		// TODO this needs to accept an output folder,
+		// also i want a way to get the title of the fiction,
+		// way earlier than im getting it.
+		all_chapters_from_fiction_to_markdown(fiction_ident)
+
+		fmt.Printf("downloaded fiction (i have no way of knowing where its stored for now, this code sucks)\n")
 		os.Exit(0)
 
 	default:
