@@ -359,7 +359,7 @@ func main() {
 		// would it be better just to download the thing, because
 		// the chapter might change, and i don't know how to handle that,
 		// maybe the 'download entire fiction' could do it and not this.
-		// also at this pouint just make a
+		// also at this point just make a
 		// 'download_rr_chapter_to_markdown_from_url' function
 		html_body := rr_get_url_or_cached(ident.to_full_url())
 
