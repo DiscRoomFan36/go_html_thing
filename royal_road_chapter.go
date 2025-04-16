@@ -6,23 +6,27 @@ package main
 
 import "strings"
 
+const RR_URL_START = "https://www.royalroad.com"
+
 type Royal_Road_Chapter struct {
 	original_url string
 
 	doc HTML_Document
 }
 
+// TODO this function is dumb, just accept a url
 func (rr_chapter Royal_Road_Chapter) is_royal_road_link() bool {
 	if rr_chapter.original_url == "" {
 		panic("did not set url before calling this function!!!")
 	}
 
-	if strings.HasPrefix(rr_chapter.original_url, "https://www.royalroad.com") {
+	if strings.HasPrefix(rr_chapter.original_url, RR_URL_START) {
 		return true
 	}
 	return false
 }
 
+// TODO this function is super dumb
 func (rr_chapter Royal_Road_Chapter) is_rr_chapter() bool {
 	if rr_chapter.original_url == "" {
 		panic("did not set url before calling this function!!!")
@@ -56,7 +60,6 @@ func (rr_chapter Royal_Road_Chapter) get_fiction_title_from_chapter() string {
 	Assert(rr_chapter.is_rr_chapter(), "HTML must be a royal road chapter link")
 
 	const FICTION_TITLE_CLASS = "<h2 style=\"font-size: 24px\" class=\"font-white inline-block\">"
-
 	title_text, err := find_element_by_header(rr_chapter.doc, FICTION_TITLE_CLASS)
 	Assert(err == nil, err)
 
