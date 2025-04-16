@@ -293,11 +293,6 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 	log("finished successfully!")
 }
 
-func contains[T comparable, U any](m map[T]U, key T) bool {
-	_, contains := m[key]
-	return contains
-}
-
 func usage(program_name string) {
 	fmt.Printf("TODO usage\n")
 	fmt.Printf("%s\n", program_name)
