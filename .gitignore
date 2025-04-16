@@ -11,3 +11,6 @@ markdown/
 # get out of here go.
 go.mod
 go.sum
+
+# still need the README
+!README.md
