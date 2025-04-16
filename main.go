@@ -75,7 +75,14 @@ func parse_RoyalRoad_url_to_chapter(url string) RR_Chapter_Identifier {
 	return RR_Chapter_Identifier(chapter)
 }
 
+const RR_URL_START = "https://www.royalroad.com"
+
+// TODO use status bools
 func parse_RoyalRoad_chapter_url_to_canonical(url string) Royal_Ident {
+	if !strings.HasPrefix(url, RR_URL_START) {
+		Assert(false, "url dose not start with "+RR_URL_START, "url = "+url)
+	}
+
 	return Royal_Ident{
 		fiction_ident: parse_RoyalRoad_url_to_fiction(url),
 		chapter_ident: parse_RoyalRoad_url_to_chapter(url),
@@ -83,7 +90,7 @@ func parse_RoyalRoad_chapter_url_to_canonical(url string) Royal_Ident {
 }
 
 func (r Royal_Ident) to_full_url() string {
-	return fmt.Sprintf("https://www.royalroad.com/fiction/%s/chapter/%s", r.fiction_ident, r.chapter_ident)
+	return fmt.Sprintf(RR_URL_START+"/fiction/%s/chapter/%s", r.fiction_ident, r.chapter_ident)
 }
 
 func (r Royal_Ident) to_cannon_file_ident() string {
@@ -113,7 +120,7 @@ func make_folder_if_not_exists(name string) error {
 	return os.Mkdir(name, 0755)
 }
 
-func get_url_or_cached(url string) string {
+func rr_get_url_or_cached(url string) string {
 	royal_ident := parse_RoyalRoad_chapter_url_to_canonical(url)
 
 	// make the cache if it doesn't exist
@@ -222,7 +229,7 @@ func all_chapters_from_fiction_to_markdown(fiction RR_Fiction_Identifier) {
 		log("%03d/%03d -> %s", i+1, len(chapters), chapter)
 		context_indent += 4
 
-		body := get_url_or_cached(chapter)
+		body := rr_get_url_or_cached(chapter)
 
 		log("parsing html")
 		context_indent += 4
@@ -321,6 +328,8 @@ func main() {
 			os.Exit(1)
 		}
 
+		fmt.Printf("Downloading 1 (one) url html page\n")
+
 		url := rest[0]
 
 		trimmed := strings.TrimPrefix(url, "https://")
@@ -330,7 +339,48 @@ func main() {
 		err := dump_string(site, filename)
 		Assert(err == nil, err)
 
-		log("downloaded HTML url to file '%s'", filename)
+		fmt.Printf("downloaded HTML url to file '%s'", filename)
+
+		os.Exit(0)
+
+	case "chapter":
+		if len(rest) != 1 {
+			fmt.Printf("Incorrect number of arguments, download chapter expects 3 gave %v\n", len(args))
+			os.Exit(1)
+		}
+
+		fmt.Printf("Downloading 1 (one) chapter from royal road url\n")
+
+		url := rest[0]
+		// this thing is gonna assert if the url is not RR,
+		ident := parse_RoyalRoad_chapter_url_to_canonical(url)
+		// this whole thing is kinda jank, is caching worth it
+		// now that the whole thing kinda works?
+		// would it be better just to download the thing, because
+		// the chapter might change, and i don't know how to handle that,
+		// maybe the 'download entire fiction' could do it and not this.
+		// also at this pouint just make a
+		// 'download_rr_chapter_to_markdown_from_url' function
+		html_body := rr_get_url_or_cached(ident.to_full_url())
+
+		// this will usually just Assert and kill itself...
+		html_doc, err := parse_HTML_Document(html_body)
+		Assert(err == nil, err)
+
+		// this is also dumb
+		rr_chapter := Royal_Road_Chapter{
+			original_url: url,
+			doc:          html_doc,
+		}
+		// this is fine, but just make it 'rr_chapter_to_markdown(html)'
+		// and just have it return a status
+		markdown := rr_chapter.to_markdown()
+
+		// 'get_chapter_title' should do the same as 'to_markdown'
+		chapter_title := rr_chapter.get_chapter_title() + ".md"
+
+		dump_string(markdown, chapter_title)
+		fmt.Printf("downloaded royal road chapter to file '%s'\n", chapter_title)
 
 		os.Exit(0)
 
